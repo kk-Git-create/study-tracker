@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学習トラッカー</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+  :root {
+    --green: #1D9E75;
+    --green-light: #E1F5EE;
+    --green-dark: #0F6E56;
+    --amber: #EF9F27;
+    --amber-light: #FAEEDA;
+    --red: #E24B4A;
+    --red-light: #FCEBEB;
+    --gray-bg: #F7F7F5;
+    --gray-card: #FFFFFF;
+    --gray-border: rgba(0,0,0,0.1);
+    --gray-text: #888;
+    --text: #1a1a1a;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--gray-bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ===== MODE SWITCHER ===== */
+  .mode-switcher {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--gray-bg);
+    border-bottom: 1px solid var(--gray-border);
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .mode-btn {
+    flex: 1;
+    max-width: 160px;
+    padding: 10px 16px;
+    border-radius: 30px;
+    border: 1.5px solid var(--gray-border);
+    background: white;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--gray-text);
+    transition: all 0.2s;
+  }
+
+  .mode-btn.active {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+  }
+
+  /* ===== SCREENS ===== */
+  .screen { display: none; padding: 16px; max-width: 480px; margin: 0 auto; }
+  .screen.active { display: block; }
+
+  /* ===== HEADER ===== */
+  .screen-header { margin-bottom: 20px; }
+  .screen-title { font-size: 20px; font-weight: 700; color: var(--text); }
+  .screen-date { font-size: 13px; color: var(--gray-text); margin-top: 3px; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--gray-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-border);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-text);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* ===== COUNTER ===== */
+  .counter-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .counter-info { flex: 1; }
+  .counter-name { font-size: 15px; font-weight: 500; }
+  .counter-hint { font-size: 12px; color: var(--gray-text); margin-top: 2px; }
+  .counter-controls { display: flex; align-items: center; gap: 12px; }
+  .count-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gray-border);
+    background: var(--gray-bg);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .count-btn:active { transform: scale(0.9); }
+  .count-val { font-size: 24px; font-weight: 700; min-width: 32px; text-align: center; }
+
+  /* ===== PROGRESS BAR ===== */
+  .progress-wrap { margin-top: 12px; }
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--gray-text);
+    margin-bottom: 6px;
+  }
+  .progress-val { font-weight: 700; color: var(--text); }
+  .progress-track {
+    height: 8px;
+    background: var(--gray-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--gray-border);
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+  .fill-green  { background: var(--green); }
+  .fill-amber  { background: var(--amber); }
+  .fill-red    { background: var(--red); }
+
+  /* ===== TOGGLE PILLS ===== */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .toggle-name { font-size: 15px; font-weight: 500; flex: 1; }
+  .toggle-sub  { font-size: 12px; color: var(--gray-text); }
+  .toggle-pill {
+    display: flex;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1.5px solid var(--gray-border);
+  }
+  .pill-opt {
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: var(--gray-text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .pill-opt.p-yes    { background: var(--green-light); color: var(--green-dark); }
+  .pill-opt.p-no     { background: var(--red-light);   color: var(--red); }
+  .pill-opt.p-done   { background: var(--green-light); color: var(--green-dark); }
+  .pill-opt.p-notyet { background: var(--amber-light); color: #854F0B; }
+
+  /* ===== SUBMIT ===== */
+  .submit-btn {
+    width: 100%;
+    padding: 14px;
+    margin-top: 16px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--green);
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Noto Sans JP', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .submit-btn:hover { background: var(--green-dark); }
+  .submit-btn:active { transform: scale(0.98); }
+  .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+  /* ===== SUCCESS ===== */
+  .success-screen {
+    display: none;
+    text-align: center;
+    padding: 48px 24px;
+  }
+  .success-icon { font-size: 56px; margin-bottom: 16px; }
+  .success-title { font-size: 20px; font-weight: 700; color: var(--green-dark); }
+  .success-sub   { font-size: 14px; color: var(--gray-text); margin-top: 8px; }
+
+  /* ===== BADGES ===== */
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .b-done   { background: var(--green-light); color: var(--green-dark); }
+  .b-notyet { background: var(--amber-light); color: #854F0B; }
+  .b-none   { background: #F1EFE8; color: #888; }
+  .b-unreported { background: #F1EFE8; color: #aaa; }
+
+  /* ===== METRIC GRID ===== */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric-card {
+    background: var(--gray-bg);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    border: 1px solid var(--gray-border);
+  }
+  .metric-val { font-size: 24px; font-weight: 700; }
+  .metric-lbl { font-size: 11px; color: var(--gray-text); margin-top: 2px; }
+
+  /* ===== TODAY ROWS ===== */
+  .today-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gray-border);
+    font-size: 14px;
+  }
+  .today-row:last-child { border-bottom: none; }
+
+  /* ===== WEEK BARS ===== */
+  .week-bars-wrap { margin-bottom: 4px; }
+  .week-bars {
+    display: flex;
+    gap: 5px;
+    align-items: flex-end;
+    height: 80px;
+    margin-bottom: 4px;
+  }
+  .day-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .day-bar { width: 100%; border-radius: 3px 3px 0 0; }
+  .bar-today { background: var(--green); }
+  .bar-past  { background: #9FE1CB; }
+  .bar-empty { background: #e8e8e8; min-height: 4px; }
+  .day-lbl { font-size: 10px; color: var(--gray-text); margin-top: 3px; }
+  .day-lbl.today { color: var(--green); font-weight: 700; }
+
+  /* ===== STREAK ===== */
+  .streak-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--gray-bg);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    border: 1px solid var(--gray-border);
+    margin-bottom: 12px;
+  }
+  .streak-num { font-size: 32px; font-weight: 700; color: var(--green); }
+  .streak-unit { font-size: 12px; color: var(--gray-text); text-align: right; }
+  .streak-lbl  { font-size: 14px; font-weight: 500; }
+  .streak-sub  { font-size: 12px; color: var(--gray-text); margin-top: 2px; }
+
+  /* ===== WEEK DOTS ===== */
+  .dots-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-done   { background: var(--green); }
+  .dot-miss   { background: var(--red); }
+  .dot-future { background: #ddd; }
+  .dot-lbl { font-size: 10px; color: var(--gray-text); }
+
+  /* ===== WEEK SUMMARY ===== */
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--gray-border);
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-val { font-weight: 700; }
+
+  /* ===== COMMENT ===== */
+  textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--gray-border);
+    background: var(--gray-bg);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    resize: none;
+    outline: none;
+    margin-top: 6px;
+  }
+  textarea:focus { border-color: var(--green); }
+  .comment-send-btn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--gray-border);
+    background: white;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .comment-send-btn:hover { background: var(--gray-bg); }
+  .comment-sent-msg { font-size: 12px; color: var(--green); margin-top: 6px; text-align: center; display: none; }
+
+  /* ===== LOADING / ERROR ===== */
+  .loading-msg { text-align: center; padding: 40px; color: var(--gray-text); font-size: 14px; }
+  .error-msg   { text-align: center; padding: 20px; color: var(--red); font-size: 13px; background: var(--red-light); border-radius: var(--radius-sm); margin-bottom: 12px; display: none; }
+
+  /* ===== PEP NOTE ===== */
+  .pep-note { font-size: 12px; color: var(--gray-text); margin-top: 4px; }
+  .pep-done-note { display: none; font-size: 12px; color: var(--green-dark); font-weight: 500; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<!-- モード切替 -->
+<div class="mode-switcher">
+  <button class="mode-btn active" onclick="switchMode('kid')" id="btn-kid">こどもの画面</button>
+  <button class="mode-btn" onclick="switchMode('parent')" id="btn-parent">親の確認画面</button>
+</div>
+
+<!-- ===== こどもの画面 ===== -->
+<div class="screen active" id="screen-kid">
+  <div class="screen-header">
+    <div class="screen-title">きょうのほうこく</div>
+    <div class="screen-date" id="kid-date"></div>
+  </div>
+
+  <div id="error-msg" class="error-msg"></div>
+
+  <div id="kid-form">
+    <!-- チャレンジタッチ -->
+    <div class="section-label">チャレンジタッチ</div>
+    <div class="card">
+      <div class="counter-row">
+        <div class="counter-info">
+          <div class="counter-name">きょうの単元数</div>
+          <div class="counter-hint">目標：1日4こ</div>
+        </div>
+        <div class="counter-controls">
+          <button class="count-btn" onclick="changeCount(-1)">−</button>
+          <div class="count-val" id="touch-count">0</div>
+          <button class="count-btn" onclick="changeCount(1)">＋</button>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span>今週の合計</span>
+          <span class="progress-val"><span id="kid-week-total">0</span> / 28こ</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-amber" id="kid-week-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 学校の宿題 -->
+    <div class="section-label">学校の宿題</div>
+    <div class="card">
+      <div class="toggle-row" style="margin-bottom:10px;">
+        <div class="toggle-name">宿題はあった？</div>
+        <div class="toggle-pill">
+          <button class="pill-opt" id="hw-yes" onclick="setToggle('hw','yes')">あり</button>
+          <button class="pill-opt" id="hw-no"  onclick="setToggle('hw','no')">なし</button>
+        </div>
+      </div>
+      <div id="hw-done-row" class="toggle-row" style="display:none;">
+        <div class="toggle-name">できた？</div>
+        <div class="toggle-pill">
+          <button class="pill-opt" id="hw-done"   onclick="setToggle('hwdone','done')">できた</button>
+          <button class="pill-opt" id="hw-notyet" onclick="setToggle('hwdone','notyet')">まだ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ペッピー -->
+    <div class="section-label">ペッピー英会話</div>
+    <div class="card">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-name">今週の予習できた？</div>
+          <div class="pep-note">今週1回できればOK！</div>
+        </div>
+        <div class="toggle-pill">
+          <button class="pill-opt" id="pep-done"   onclick="setToggle('pep','done')">できた</button>
+          <button class="pill-opt" id="pep-notyet" onclick="setToggle('pep','notyet')">まだ</button>
+        </div>
+      </div>
+      <div class="pep-done-note" id="pep-done-note">✓ 今週の予習完了！</div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitReport()">ほうこくする！</button>
+  </div>
+
+  <div class="success-screen" id="kid-success">
+    <div class="success-icon">🌟</div>
+    <div class="success-title">きょうもよくがんばった！</div>
+    <div class="success-sub">お父さん・お母さんに伝えたよ</div>
+    <button class="submit-btn" style="max-width:200px;margin:24px auto 0;" onclick="resetForm()">もう一度入力する</button>
+  </div>
+</div>
+
+<!-- ===== 親の確認画面 ===== -->
+<div class="screen" id="screen-parent">
+  <div class="screen-header">
+    <div class="screen-title">学習ダッシュボード</div>
+    <div class="screen-date" id="parent-date"></div>
+  </div>
+
+  <div id="parent-loading" class="loading-msg">読み込み中...</div>
+  <div id="parent-content" style="display:none;">
+
+    <!-- チャレンジタッチ週間進捗 -->
+    <div class="section-label">チャレンジタッチ　今週の進捗</div>
+    <div class="card">
+      <div class="progress-header" style="margin-bottom:8px;">
+        <span>週間目標 28単元</span>
+        <span class="progress-val"><span id="p-week-total">0</span> / 28</span>
+      </div>
+      <div class="progress-track" style="height:10px;">
+        <div class="progress-fill fill-amber" id="p-week-bar" style="width:0%"></div>
+      </div>
+      <div style="font-size:12px;color:var(--gray-text);margin-top:6px;" id="p-week-sub"></div>
+      <!-- 棒グラフ -->
+      <div class="week-bars-wrap" style="margin-top:14px;">
+        <div class="week-bars" id="p-week-bars"></div>
+        <div style="display:flex;gap:5px;" id="p-week-labels"></div>
+      </div>
+    </div>
+
+    <!-- 連続週記録 -->
+    <div class="section-label">28単元達成　連続週記録</div>
+    <div class="streak-card">
+      <div>
+        <div class="streak-lbl">連続達成中</div>
+        <div class="streak-sub">週28単元クリアの連続</div>
+        <div class="dots-row" id="p-streak-dots"></div>
+      </div>
+      <div>
+        <div class="streak-num" id="p-streak">0</div>
+        <div class="streak-unit">週連続</div>
+      </div>
+    </div>
+
+    <!-- 今日の報告 -->
+    <div class="section-label">今日の報告</div>
+    <div class="card">
+      <div class="today-row">
+        <span>チャレンジタッチ（今日）</span>
+        <span id="p-touch-today" class="badge b-unreported">未報告</span>
+      </div>
+      <div class="today-row">
+        <span>学校の宿題</span>
+        <span id="p-hw-today" class="badge b-unreported">未報告</span>
+      </div>
+    </div>
+
+    <!-- ペッピー（週1回） -->
+    <div class="section-label">ペッピー英会話（今週の予習）</div>
+    <div class="card">
+      <div class="today-row" style="border-bottom:none;padding-bottom:4px;">
+        <div>
+          <div>今週の予習</div>
+          <div style="font-size:11px;color:var(--gray-text);">週1回できればOK</div>
+        </div>
+        <span id="p-pep" class="badge b-unreported">未報告</span>
+      </div>
+      <div class="dots-row" id="p-pep-history"></div>
+    </div>
+
+    <!-- 週サマリー -->
+    <div class="section-label">今週のまとめ</div>
+    <div class="card">
+      <div class="summary-row">
+        <span>チャレンジタッチ 週計</span>
+        <span class="summary-val" id="p-touch-total">—</span>
+      </div>
+      <div class="summary-row">
+        <span>宿題 達成率（今週）</span>
+        <span class="summary-val" id="p-hw-rate">—</span>
+      </div>
+      <div class="summary-row">
+        <span>ペッピー予習（今週）</span>
+        <span class="summary-val" id="p-pep-week">—</span>
+      </div>
+    </div>
+
+    <!-- コメント -->
+    <div class="section-label">コメントを送る</div>
+    <div class="card">
+      <textarea id="comment-input" rows="2" placeholder="よくできたね！など…"></textarea>
+      <button class="comment-send-btn" onclick="sendComment()">送る</button>
+      <div class="comment-sent-msg" id="comment-sent">コメントを送りました！</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAunnLlPiq3Em3k2knGHQlSynz3ovLzDxU",
+  authDomain: "sutdy-tracker.firebaseapp.com",
+  databaseURL: "https://sutdy-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sutdy-tracker",
+  storageBucket: "sutdy-tracker.firebasestorage.app",
+  messagingSenderId: "681650023546",
+  appId: "1:681650023546:web:9b817d4ffc1fa364f2dfc3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ===== 日付ユーティリティ =====
+const DAY_LABELS = ['日','月','火','水','木','金','土'];
+
+function getWeekKey(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
+}
+
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function formatDateJP(dateStr) {
+  const [y,m,dd] = dateStr.split('-');
+  const d = new Date(parseInt(y), parseInt(m)-1, parseInt(dd));
+  return `${y}年${parseInt(m)}月${parseInt(dd)}日（${DAY_LABELS[d.getDay()]}）`;
+}
+
+function getWeekDays() {
+  const today = new Date();
+  const day = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    days.push({ key, label: DAY_LABELS[d.getDay()], date: d });
+  }
+  return days;
+}
+
+// ===== 状態 =====
+const state = { touchCount: 0, hw: null, hwDone: null, pep: null };
+const todayKey = getTodayKey();
+const weekKey  = getWeekKey(new Date());
+
+// ===== 日付表示 =====
+document.getElementById('kid-date').textContent    = formatDateJP(todayKey);
+document.getElementById('parent-date').textContent = formatDateJP(todayKey);
+
+// ===== モード切替 =====
+window.switchMode = function(mode) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + mode).classList.add('active');
+  document.getElementById('btn-' + mode).classList.add('active');
+  if (mode === 'parent') loadParentData();
+};
+
+// ===== カウンター =====
+window.changeCount = function(delta) {
+  state.touchCount = Math.max(0, state.touchCount + delta);
+  document.getElementById('touch-count').textContent = state.touchCount;
+  updateKidWeekBar();
+};
+
+async function updateKidWeekBar() {
+  const weekDays = getWeekDays();
+  const snapshot = await get(ref(db, `reports/${weekKey}`));
+  const weekReports = snapshot.val() || {};
+  let weekTotal = state.touchCount;
+  weekDays.forEach(d => {
+    if (d.key !== todayKey && weekReports[d.key]) {
+      weekTotal += (weekReports[d.key].touchCount || 0);
+    }
+  });
+  document.getElementById('kid-week-total').textContent = weekTotal;
+  const pct = Math.min(100, Math.round(weekTotal / 28 * 100));
+  const bar = document.getElementById('kid-week-bar');
+  bar.style.width = pct + '%';
+  bar.className = 'progress-fill ' + (pct >= 100 ? 'fill-green' : pct >= 50 ? 'fill-amber' : 'fill-red');
+}
+
+// ===== トグル =====
+window.setToggle = function(key, val) {
+  if (key === 'hw') {
+    state.hw = val;
+    document.getElementById('hw-yes').className = 'pill-opt' + (val==='yes' ? ' p-yes' : '');
+    document.getElementById('hw-no').className  = 'pill-opt' + (val==='no'  ? ' p-no'  : '');
+    document.getElementById('hw-done-row').style.display = val==='yes' ? 'flex' : 'none';
+    if (val==='no') { state.hwDone = null; ['hw-done','hw-notyet'].forEach(id => document.getElementById(id).className='pill-opt'); }
+  } else if (key === 'hwdone') {
+    state.hwDone = val;
+    document.getElementById('hw-done').className   = 'pill-opt' + (val==='done'   ? ' p-done'   : '');
+    document.getElementById('hw-notyet').className = 'pill-opt' + (val==='notyet' ? ' p-notyet' : '');
+  } else if (key === 'pep') {
+    state.pep = val;
+    document.getElementById('pep-done').className   = 'pill-opt' + (val==='done'   ? ' p-done'   : '');
+    document.getElementById('pep-notyet').className = 'pill-opt' + (val==='notyet' ? ' p-notyet' : '');
+    document.getElementById('pep-done-note').style.display = val==='done' ? 'block' : 'none';
+  }
+};
+
+// ===== 報告送信 =====
+window.submitReport = async function() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+  try {
+    await set(ref(db, `reports/${weekKey}/${todayKey}`), {
+      touchCount: state.touchCount,
+      hw: state.hw === 'no' ? 'none' : (state.hwDone || null),
+      pep: state.pep,
+      timestamp: Date.now()
+    });
+    document.getElementById('kid-form').style.display = 'none';
+    document.getElementById('kid-success').style.display = 'block';
+  } catch(e) {
+    const err = document.getElementById('error-msg');
+    err.style.display = 'block';
+    err.textContent = '送信に失敗しました。通信状況を確認してください。';
+    btn.disabled = false;
+    btn.textContent = 'ほうこくする！';
+  }
+};
+
+window.resetForm = function() {
+  state.touchCount = 0; state.hw = null; state.hwDone = null; state.pep = null;
+  document.getElementById('touch-count').textContent = '0';
+  ['hw-yes','hw-no','hw-done','hw-notyet','pep-done','pep-notyet'].forEach(id => document.getElementById(id).className='pill-opt');
+  document.getElementById('hw-done-row').style.display = 'none';
+  document.getElementById('pep-done-note').style.display = 'none';
+  document.getElementById('kid-form').style.display = 'block';
+  document.getElementById('kid-success').style.display = 'none';
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = false; btn.textContent = 'ほうこくする！';
+};
+
+// ===== 親画面データ読み込み =====
+async function loadParentData() {
+  document.getElementById('parent-loading').style.display = 'block';
+  document.getElementById('parent-content').style.display = 'none';
+  try {
+    const snapshot = await get(ref(db, `reports/${weekKey}`));
+    const weekReports = snapshot.val() || {};
+    renderParentView(weekReports);
+    document.getElementById('parent-loading').style.display = 'none';
+    document.getElementById('parent-content').style.display = 'block';
+  } catch(e) {
+    document.getElementById('parent-loading').textContent = 'データの読み込みに失敗しました。';
+  }
+}
+
+function renderParentView(weekReports) {
+  const weekDays = getWeekDays();
+
+  // 週合計
+  let weekTotal = 0;
+  weekDays.forEach(d => { weekTotal += (weekReports[d.key]?.touchCount || 0); });
+  const todayReport = weekReports[todayKey] || null;
+
+  // 進捗バー
+  document.getElementById('p-week-total').textContent = weekTotal;
+  const pct = Math.min(100, Math.round(weekTotal / 28 * 100));
+  const bar = document.getElementById('p-week-bar');
+  bar.style.width = pct + '%';
+  bar.className = 'progress-fill ' + (pct >= 100 ? 'fill-green' : pct >= 50 ? 'fill-amber' : 'fill-red');
+
+  // 残り計算
+  const remaining = Math.max(0, 28 - weekTotal);
+  const todayDayOfWeek = new Date().getDay();
+  const remainDays = todayDayOfWeek === 0 ? 0 : 7 - todayDayOfWeek;
+  if (remaining === 0) {
+    document.getElementById('p-week-sub').textContent = '今週の目標達成！🎉';
+  } else if (remainDays === 0) {
+    document.getElementById('p-week-sub').textContent = `残り ${remaining}単元（今日が最終日）`;
+  } else {
+    document.getElementById('p-week-sub').textContent = `残り ${remaining}単元 ／ 残り${remainDays}日（1日あたり${(remaining/remainDays).toFixed(1)}単元）`;
+  }
+
+  // 棒グラフ
+  const maxTouch = Math.max(...weekDays.map(d => weekReports[d.key]?.touchCount || 0), 4);
+  const barsEl   = document.getElementById('p-week-bars');
+  const labsEl   = document.getElementById('p-week-labels');
+  barsEl.innerHTML = ''; labsEl.innerHTML = '';
+  weekDays.forEach(d => {
+    const val = weekReports[d.key]?.touchCount || 0;
+    const isToday = d.key === todayKey;
+    const col = document.createElement('div'); col.className = 'day-col';
+    const barEl = document.createElement('div');
+    const h = val > 0 ? Math.max(8, Math.round(val / maxTouch * 68)) : 4;
+    barEl.className = 'day-bar ' + (isToday ? 'bar-today' : (val > 0 ? 'bar-past' : 'bar-empty'));
+    barEl.style.height = h + 'px';
+    col.appendChild(barEl); barsEl.appendChild(col);
+    const lbl = document.createElement('div');
+    lbl.className = 'day-lbl' + (isToday ? ' today' : '');
+    lbl.style.flex = '1'; lbl.style.textAlign = 'center';
+    lbl.textContent = d.label;
+    labsEl.appendChild(lbl);
+  });
+
+  // 今日の報告
+  const touchEl = document.getElementById('p-touch-today');
+  if (todayReport) {
+    const tc = todayReport.touchCount || 0;
+    touchEl.textContent = tc + ' 単元';
+    touchEl.className = 'badge ' + (tc >= 4 ? 'b-done' : tc > 0 ? 'b-notyet' : 'b-none');
+  } else {
+    touchEl.textContent = '未報告'; touchEl.className = 'badge b-unreported';
+  }
+
+  const hwEl = document.getElementById('p-hw-today');
+  if (todayReport?.hw === 'done')   { hwEl.className='badge b-done';   hwEl.textContent='完了'; }
+  else if (todayReport?.hw === 'notyet') { hwEl.className='badge b-notyet'; hwEl.textContent='まだ'; }
+  else if (todayReport?.hw === 'none')   { hwEl.className='badge b-none';   hwEl.textContent='なし'; }
+  else { hwEl.className='badge b-unreported'; hwEl.textContent='未報告'; }
+
+  // ペッピー（週単位）
+  const pepDone = weekDays.some(d => weekReports[d.key]?.pep === 'done');
+  const pepEl = document.getElementById('p-pep');
+  pepEl.textContent = pepDone ? '完了' : '未完了';
+  pepEl.className = 'badge ' + (pepDone ? 'b-done' : 'b-notyet');
+
+  // ペッピー履歴ドット（直近5週）
+  renderPepHistory(pepDone);
+
+  // 連続週記録
+  renderStreakDots(weekTotal >= 28);
+
+  // サマリー
+  document.getElementById('p-touch-total').textContent = weekTotal + ' 単元';
+  const hwDays  = weekDays.filter(d => weekReports[d.key]?.hw && weekReports[d.key].hw !== 'none');
+  const hwDoneN = hwDays.filter(d => weekReports[d.key].hw === 'done');
+  document.getElementById('p-hw-rate').textContent = hwDays.length ? Math.round(hwDoneN.length/hwDays.length*100)+'%' : '—';
+  document.getElementById('p-pep-week').textContent = pepDone ? '完了' : '未完了';
+}
+
+function renderStreakDots(currentWeekDone) {
+  const el = document.getElementById('p-streak-dots');
+  el.innerHTML = '';
+  const weeks = [true, true, currentWeekDone];
+  const streak = currentWeekDone ? 3 : 2;
+  document.getElementById('p-streak').textContent = streak;
+  weeks.forEach((done, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'dot ' + (i === weeks.length-1 && !currentWeekDone ? 'dot-future' : (done ? 'dot-done' : 'dot-miss'));
+    el.appendChild(dot);
+  });
+  const note = document.createElement('div');
+  note.className = 'dot-lbl';
+  note.textContent = '← 過去3週';
+  el.appendChild(note);
+}
+
+function renderPepHistory(currentWeekDone) {
+  const el = document.getElementById('p-pep-history');
+  el.innerHTML = '';
+  const weeks = [true, true, false, true, currentWeekDone];
+  weeks.forEach((done, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'dot ' + (i === weeks.length-1 && !currentWeekDone ? 'dot-future' : (done ? 'dot-done' : 'dot-miss'));
+    el.appendChild(dot);
+  });
+  const note = document.createElement('div');
+  note.className = 'dot-lbl';
+  note.textContent = '← 過去5週';
+  el.appendChild(note);
+}
+
+// ===== コメント送信 =====
+window.sendComment = async function() {
+  const txt = document.getElementById('comment-input').value.trim();
+  if (!txt) return;
+  try {
+    await set(ref(db, `comments/${Date.now()}`), { text: txt, timestamp: Date.now() });
+    document.getElementById('comment-sent').style.display = 'block';
+    document.getElementById('comment-input').value = '';
+    setTimeout(() => { document.getElementById('comment-sent').style.display = 'none'; }, 3000);
+  } catch(e) {
+    alert('送信に失敗しました');
+  }
+};
+
+// 初期ロード
+updateKidWeekBar();
+</script>
+</body>
+</html>
