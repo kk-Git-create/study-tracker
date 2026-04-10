@@ -428,6 +428,11 @@
     <div class="success-sub">お父さん・お母さんに伝えたよ</div>
     <button class="submit-btn" style="max-width:200px;margin:24px auto 0;" onclick="resetForm()">もう一度入力する</button>
   </div>
+
+  <div id="parent-comment-box" style="display:none;margin-top:4px;background:#E1F5EE;border-radius:12px;padding:14px 16px;border:1px solid #9FE1CB;">
+    <div style="font-size:11px;font-weight:700;color:#0F6E56;letter-spacing:0.06em;margin-bottom:6px;">お父さん・お母さんより</div>
+    <div style="font-size:15px;color:#085041;font-weight:500;line-height:1.7;" id="parent-comment-text"></div>
+  </div>
 </div>
 
 <!-- ===== 親の確認画面 ===== -->
@@ -693,7 +698,7 @@ async function loadParentData() {
   }
 }
 
-function renderParentView(weekReports) {
+async function renderParentView(weekReports) {
   const weekDays = getWeekDays();
 
   // 週合計
@@ -763,11 +768,11 @@ function renderParentView(weekReports) {
   pepEl.textContent = pepDone ? '完了' : '未完了';
   pepEl.className = 'badge ' + (pepDone ? 'b-done' : 'b-notyet');
 
-  // ペッピー履歴ドット（直近5週）
-  renderPepHistory(pepDone);
+  // ペッピー履歴ドット（直近4週）
+  await renderPepHistory(pepDone);
 
   // 連続週記録
-  renderStreakDots(weekTotal >= 28);
+  await renderStreakDots(weekTotal >= 28);
 
   // サマリー
   document.getElementById('p-touch-total').textContent = weekTotal + ' 単元';
@@ -777,15 +782,45 @@ function renderParentView(weekReports) {
   document.getElementById('p-pep-week').textContent = pepDone ? '完了' : '未完了';
 }
 
-function renderStreakDots(currentWeekDone) {
+async function renderStreakDots(currentWeekDone) {
   const el = document.getElementById('p-streak-dots');
   el.innerHTML = '';
-  const weeks = [true, true, currentWeekDone];
-  const streak = currentWeekDone ? 3 : 2;
+
+  // 過去3週分のweekKeyを計算
+  const pastWeeks = [];
+  for (let i = 3; i >= 1; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i * 7);
+    pastWeeks.push(getWeekKey(d));
+  }
+
+  // Firebaseから過去3週のデータを取得して28単元達成か判定
+  const pastResults = [];
+  for (const wk of pastWeeks) {
+    try {
+      const snap = await get(ref(db, `reports/${wk}`));
+      const data = snap.val() || {};
+      const total = Object.values(data).reduce((s, d) => s + (d.touchCount || 0), 0);
+      pastResults.push(total >= 28);
+    } catch(e) {
+      pastResults.push(false);
+    }
+  }
+
+  const allWeeks = [...pastResults, currentWeekDone];
+
+  // 連続週数を計算（末尾から連続したtrueの数）
+  let streak = 0;
+  for (let i = allWeeks.length - 1; i >= 0; i--) {
+    if (allWeeks[i]) streak++;
+    else break;
+  }
   document.getElementById('p-streak').textContent = streak;
-  weeks.forEach((done, i) => {
+
+  allWeeks.forEach((done, i) => {
     const dot = document.createElement('div');
-    dot.className = 'dot ' + (i === weeks.length-1 && !currentWeekDone ? 'dot-future' : (done ? 'dot-done' : 'dot-miss'));
+    const isCurrent = i === allWeeks.length - 1;
+    dot.className = 'dot ' + (isCurrent && !done ? 'dot-future' : done ? 'dot-done' : 'dot-miss');
     el.appendChild(dot);
   });
   const note = document.createElement('div');
@@ -794,18 +829,41 @@ function renderStreakDots(currentWeekDone) {
   el.appendChild(note);
 }
 
-function renderPepHistory(currentWeekDone) {
+async function renderPepHistory(currentWeekDone) {
   const el = document.getElementById('p-pep-history');
   el.innerHTML = '';
-  const weeks = [true, true, false, true, currentWeekDone];
-  weeks.forEach((done, i) => {
+
+  // 過去4週分のweekKeyを計算
+  const pastWeeks = [];
+  for (let i = 4; i >= 1; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i * 7);
+    pastWeeks.push(getWeekKey(d));
+  }
+
+  // Firebaseから過去4週のペッピーデータを取得
+  const pastResults = [];
+  for (const wk of pastWeeks) {
+    try {
+      const snap = await get(ref(db, `reports/${wk}`));
+      const data = snap.val() || {};
+      const done = Object.values(data).some(d => d.pep === 'done');
+      pastResults.push(done);
+    } catch(e) {
+      pastResults.push(false);
+    }
+  }
+
+  const allWeeks = [...pastResults, currentWeekDone];
+  allWeeks.forEach((done, i) => {
     const dot = document.createElement('div');
-    dot.className = 'dot ' + (i === weeks.length-1 && !currentWeekDone ? 'dot-future' : (done ? 'dot-done' : 'dot-miss'));
+    const isCurrent = i === allWeeks.length - 1;
+    dot.className = 'dot ' + (isCurrent && !done ? 'dot-future' : done ? 'dot-done' : 'dot-miss');
     el.appendChild(dot);
   });
   const note = document.createElement('div');
   note.className = 'dot-lbl';
-  note.textContent = '← 過去5週';
+  note.textContent = '← 過去4週';
   el.appendChild(note);
 }
 
@@ -814,7 +872,7 @@ window.sendComment = async function() {
   const txt = document.getElementById('comment-input').value.trim();
   if (!txt) return;
   try {
-    await set(ref(db, `comments/${Date.now()}`), { text: txt, timestamp: Date.now() });
+    await set(ref(db, `comments/latest`), { text: txt, timestamp: Date.now() });
     document.getElementById('comment-sent').style.display = 'block';
     document.getElementById('comment-input').value = '';
     setTimeout(() => { document.getElementById('comment-sent').style.display = 'none'; }, 3000);
@@ -822,6 +880,17 @@ window.sendComment = async function() {
     alert('送信に失敗しました');
   }
 };
+
+// ===== こども画面：コメントをリアルタイム受信 =====
+onValue(ref(db, 'comments/latest'), (snapshot) => {
+  const data = snapshot.val();
+  if (!data || !data.text) return;
+  const box = document.getElementById('parent-comment-box');
+  const txt = document.getElementById('parent-comment-text');
+  if (!box || !txt) return;
+  txt.textContent = data.text;
+  box.style.display = 'block';
+});
 
 // 初期ロード
 updateKidWeekBar();
