@@ -179,6 +179,55 @@
   .pill-opt.p-done   { background: var(--green-light); color: var(--green-dark); }
   .pill-opt.p-notyet { background: var(--amber-light); color: #854F0B; }
 
+  /* ===== WORK PAGES INPUT ===== */
+  .work-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-border);
+  }
+  .work-row:last-child { border-bottom: none; }
+  .work-subject { font-size: 15px; font-weight: 500; flex: 1; }
+  .work-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .work-input {
+    width: 64px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--gray-border);
+    background: var(--gray-bg);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    outline: none;
+  }
+  .work-input:focus { border-color: var(--green); }
+  .work-unit { font-size: 12px; color: var(--gray-text); }
+  .work-done-btn {
+    padding: 5px 10px;
+    border-radius: 16px;
+    border: 1.5px solid var(--gray-border);
+    background: transparent;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--gray-text);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .work-done-btn.active {
+    background: var(--green-light);
+    border-color: var(--green);
+    color: var(--green-dark);
+  }
+
   /* ===== SUBMIT ===== */
   .submit-btn {
     width: 100%;
@@ -301,6 +350,27 @@
   .summary-row:last-child { border-bottom: none; }
   .summary-val { font-weight: 700; }
 
+  /* ===== WORK SUMMARY TABLE (親画面) ===== */
+  .work-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .work-table th {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-text);
+    text-align: left;
+    padding: 4px 0 6px;
+    border-bottom: 1px solid var(--gray-border);
+  }
+  .work-table td {
+    padding: 7px 0;
+    border-bottom: 1px solid var(--gray-border);
+  }
+  .work-table tr:last-child td { border-bottom: none; }
+  .work-table .val-col { text-align: right; font-weight: 700; }
+
   /* ===== COMMENT ===== */
   textarea {
     width: 100%;
@@ -381,6 +451,14 @@
         <div class="progress-track">
           <div class="progress-fill fill-amber" id="kid-week-bar" style="width:0%"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ワークのページ数 -->
+    <div class="section-label">ワーク（きょうやったページ数）</div>
+    <div class="card">
+      <div id="work-rows">
+        <!-- JS で生成 -->
       </div>
     </div>
 
@@ -490,6 +568,22 @@
       </div>
     </div>
 
+    <!-- ワーク（今日のページ数） -->
+    <div class="section-label">ワーク　今日のページ数</div>
+    <div class="card">
+      <table class="work-table">
+        <thead>
+          <tr>
+            <th>教科</th>
+            <th class="val-col">今日</th>
+          </tr>
+        </thead>
+        <tbody id="p-work-table-body">
+          <!-- JS で生成 -->
+        </tbody>
+      </table>
+    </div>
+
     <!-- ペッピー（週1回） -->
     <div class="section-label">ペッピー英会話（今週の予習）</div>
     <div class="card">
@@ -549,6 +643,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// ===== 教科リスト =====
+const SUBJECTS = ['国語', '数学', '理科', '社会', '英語'];
+
 // ===== 日付ユーティリティ =====
 const DAY_LABELS = ['日','月','火','水','木','金','土'];
 
@@ -587,13 +684,76 @@ function getWeekDays() {
 }
 
 // ===== 状態 =====
-const state = { touchCount: 0, hw: null, hwDone: null, pep: null };
+// workPages: { 国語: {pages: 0, finished: false}, ... }
+const state = {
+  touchCount: 0,
+  hw: null,
+  hwDone: null,
+  pep: null,
+  workPages: Object.fromEntries(SUBJECTS.map(s => [s, { pages: 0, finished: false }]))
+};
 const todayKey = getTodayKey();
 const weekKey  = getWeekKey(new Date());
 
 // ===== 日付表示 =====
 document.getElementById('kid-date').textContent    = formatDateJP(todayKey);
 document.getElementById('parent-date').textContent = formatDateJP(todayKey);
+
+// ===== ワーク入力UI生成（こども画面） =====
+function buildWorkRows() {
+  const container = document.getElementById('work-rows');
+  container.innerHTML = '';
+  SUBJECTS.forEach(subject => {
+    const row = document.createElement('div');
+    row.className = 'work-row';
+    row.innerHTML = `
+      <div class="work-subject">${subject}</div>
+      <div class="work-input-wrap">
+        <input
+          class="work-input"
+          type="number"
+          min="0"
+          inputmode="numeric"
+          id="work-input-${subject}"
+          value="0"
+          placeholder="0"
+          onchange="onWorkInput('${subject}', this.value)"
+          oninput="onWorkInput('${subject}', this.value)"
+        >
+        <span class="work-unit">ページ</span>
+        <button
+          class="work-done-btn"
+          id="work-done-btn-${subject}"
+          onclick="toggleWorkFinished('${subject}')"
+        >範囲終了</button>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+buildWorkRows();
+
+window.onWorkInput = function(subject, val) {
+  const pages = Math.max(0, parseInt(val) || 0);
+  state.workPages[subject].pages = pages;
+  // 数字が入力されたら「範囲終了」を解除
+  if (pages > 0) {
+    state.workPages[subject].finished = false;
+    const btn = document.getElementById(`work-done-btn-${subject}`);
+    if (btn) btn.classList.remove('active');
+  }
+};
+
+window.toggleWorkFinished = function(subject) {
+  const current = state.workPages[subject].finished;
+  const newVal = !current;
+  state.workPages[subject].finished = newVal;
+  state.workPages[subject].pages = 0;
+  const btn = document.getElementById(`work-done-btn-${subject}`);
+  const input = document.getElementById(`work-input-${subject}`);
+  if (btn) btn.classList.toggle('active', newVal);
+  if (input) input.value = 0;
+};
 
 // ===== モード切替 =====
 window.switchMode = function(mode) {
@@ -653,11 +813,20 @@ window.submitReport = async function() {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   btn.textContent = '送信中...';
+
+  // ワークページ数をまとめる
+  const workData = {};
+  SUBJECTS.forEach(s => {
+    const wp = state.workPages[s];
+    workData[s] = wp.finished ? 'finished' : wp.pages;
+  });
+
   try {
     await set(ref(db, `reports/${weekKey}/${todayKey}`), {
       touchCount: state.touchCount,
       hw: state.hw === 'no' ? 'none' : (state.hwDone || null),
       pep: state.pep,
+      work: workData,
       timestamp: Date.now()
     });
     document.getElementById('kid-form').style.display = 'none';
@@ -673,10 +842,18 @@ window.submitReport = async function() {
 
 window.resetForm = function() {
   state.touchCount = 0; state.hw = null; state.hwDone = null; state.pep = null;
+  state.workPages = Object.fromEntries(SUBJECTS.map(s => [s, { pages: 0, finished: false }]));
   document.getElementById('touch-count').textContent = '0';
   ['hw-yes','hw-no','hw-done','hw-notyet','pep-done','pep-notyet'].forEach(id => document.getElementById(id).className='pill-opt');
   document.getElementById('hw-done-row').style.display = 'none';
   document.getElementById('pep-done-note').style.display = 'none';
+  // ワーク入力リセット
+  SUBJECTS.forEach(s => {
+    const input = document.getElementById(`work-input-${s}`);
+    const btn = document.getElementById(`work-done-btn-${s}`);
+    if (input) input.value = 0;
+    if (btn) btn.classList.remove('active');
+  });
   document.getElementById('kid-form').style.display = 'block';
   document.getElementById('kid-success').style.display = 'none';
   const btn = document.getElementById('submit-btn');
@@ -690,7 +867,7 @@ async function loadParentData() {
   try {
     const snapshot = await get(ref(db, `reports/${weekKey}`));
     const weekReports = snapshot.val() || {};
-    renderParentView(weekReports);
+    await renderParentView(weekReports);
     document.getElementById('parent-loading').style.display = 'none';
     document.getElementById('parent-content').style.display = 'block';
   } catch(e) {
@@ -762,6 +939,29 @@ async function renderParentView(weekReports) {
   else if (todayReport?.hw === 'none')   { hwEl.className='badge b-none';   hwEl.textContent='なし'; }
   else { hwEl.className='badge b-unreported'; hwEl.textContent='未報告'; }
 
+  // ワーク今日のページ数（親画面テーブル）
+  const tbody = document.getElementById('p-work-table-body');
+  tbody.innerHTML = '';
+  SUBJECTS.forEach(subject => {
+    const tr = document.createElement('tr');
+    const workVal = todayReport?.work?.[subject];
+    let displayVal, displayClass;
+    if (!todayReport) {
+      displayVal = '未報告'; displayClass = 'b-unreported';
+    } else if (workVal === 'finished') {
+      displayVal = '範囲終了'; displayClass = 'b-done';
+    } else if (typeof workVal === 'number' && workVal > 0) {
+      displayVal = workVal + ' p'; displayClass = 'b-done';
+    } else {
+      displayVal = '0 p'; displayClass = 'b-none';
+    }
+    tr.innerHTML = `
+      <td>${subject}</td>
+      <td class="val-col"><span class="badge ${displayClass}">${displayVal}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
   // ペッピー（週単位）
   const pepDone = weekDays.some(d => weekReports[d.key]?.pep === 'done');
   const pepEl = document.getElementById('p-pep');
@@ -786,7 +986,6 @@ async function renderStreakDots(currentWeekDone) {
   const el = document.getElementById('p-streak-dots');
   el.innerHTML = '';
 
-  // 過去3週分のweekKeyを計算
   const pastWeeks = [];
   for (let i = 3; i >= 1; i--) {
     const d = new Date();
@@ -794,7 +993,6 @@ async function renderStreakDots(currentWeekDone) {
     pastWeeks.push(getWeekKey(d));
   }
 
-  // Firebaseから過去3週のデータを取得して28単元達成か判定
   const pastResults = [];
   for (const wk of pastWeeks) {
     try {
@@ -809,7 +1007,6 @@ async function renderStreakDots(currentWeekDone) {
 
   const allWeeks = [...pastResults, currentWeekDone];
 
-  // 連続週数を計算（末尾から連続したtrueの数）
   let streak = 0;
   for (let i = allWeeks.length - 1; i >= 0; i--) {
     if (allWeeks[i]) streak++;
@@ -833,7 +1030,6 @@ async function renderPepHistory(currentWeekDone) {
   const el = document.getElementById('p-pep-history');
   el.innerHTML = '';
 
-  // 過去4週分のweekKeyを計算
   const pastWeeks = [];
   for (let i = 4; i >= 1; i--) {
     const d = new Date();
@@ -841,7 +1037,6 @@ async function renderPepHistory(currentWeekDone) {
     pastWeeks.push(getWeekKey(d));
   }
 
-  // Firebaseから過去4週のペッピーデータを取得
   const pastResults = [];
   for (const wk of pastWeeks) {
     try {
